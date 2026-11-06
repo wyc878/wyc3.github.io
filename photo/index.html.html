@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>农场捉迷藏 · 帮小动物躲开小狗</title>
+<style>
+  :root{
+    --paper:#fffaf0; --ink:#4a3b2a; --ink-soft:#8a7458;
+    --line:#e9d9b9; --orange:#e8763a; --orange-dark:#c95525;
+    --yellow:#f7bd3f; --green:#6fae3f; --pink:#f09ab0; --blue:#7fc4e8;
+    --shadow:0 10px 28px rgba(110,80,40,.16);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:"PingFang SC","Microsoft YaHei","Hiragino Sans GB",system-ui,sans-serif;
+    color:var(--ink);
+    background:radial-gradient(1200px 700px at 50% -10%,#fff6e0 0%,#f6e9cd 55%,#efdfbf 100%);
+    min-height:100vh; padding:14px 14px 26px;
+    display:flex; justify-content:center;
+  }
+  .app{width:100%;max-width:1280px}
+  button{font-family:inherit;cursor:pointer;border:none;color:inherit}
+
+  /* ---------- HUD ---------- */
+  .hud{
+    display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+    background:var(--paper);border:2px solid var(--line);border-radius:20px;
+    padding:10px 14px;box-shadow:var(--shadow);margin-bottom:12px;
+  }
+  .brand{display:flex;align-items:center;gap:10px;min-width:210px}
+  .brand .logo{font-size:30px;line-height:1;filter:drop-shadow(0 2px 0 #e6cfa5)}
+  .brand h1{font-size:19px;margin:0;letter-spacing:1px}
+  .brand p{font-size:11.5px;margin:2px 0 0;color:var(--ink-soft)}
+  .timer-wrap{flex:1;min-width:210px;display:flex;align-items:center;gap:10px}
+  .clock{
+    font-variant-numeric:tabular-nums;font-size:27px;font-weight:800;letter-spacing:1px;
+    color:var(--orange-dark);background:#fff3dd;border:2px solid #f3d69c;
+    padding:3px 12px;border-radius:14px;min-width:104px;text-align:center;
+  }
+  .timer-bar{height:11px;flex:1;min-width:90px;background:#f0e2c6;border-radius:20px;overflow:hidden}
+  .timer-fill{height:100%;width:100%;border-radius:20px;background:linear-gradient(90deg,#8cc84b,#f7bd3f);transition:width .2s linear,background .3s}
+  .timer-wrap.danger .clock{color:#fff;background:#e4584a;border-color:#e4584a;animation:pulse .7s infinite}
+  .timer-wrap.danger .timer-fill{background:#e4584a}
+  @keyframes pulse{50%{transform:scale(1.05)}}
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{
+    display:flex;align-items:center;gap:4px;font-size:12px;font-weight:700;
+    background:#fff;border:2px solid var(--line);border-radius:999px;padding:4px 9px;
+    transition:all .2s;white-space:nowrap;
+  }
+  .chip .e{font-size:15px}
+  .chip.done{background:#e9f7d9;border-color:#a8d878;color:#4c7a22}
+  .chip.back{cursor:pointer}
+  .chip.back:hover{background:#fff0d8;transform:translateY(-2px)}
+  .hud-btns{display:flex;gap:6px}
+  .icon-btn{
+    background:#fff;border:2px solid var(--line);border-radius:12px;
+    padding:7px 11px;font-size:12.5px;font-weight:700;transition:.18s;
+  }
+  .icon-btn:hover{background:#fff0d8;transform:translateY(-2px)}
+  .icon-btn.on{background:#ffe9c9;border-color:var(--orange)}
+
+  /* ---------- clues ---------- */
+  .clue-panel{
+    display:none;background:var(--paper);border:2px solid var(--line);border-radius:18px;
+    padding:12px 14px;margin-bottom:12px;box-shadow:var(--shadow);
+  }
+  .clue-panel.show{display:block;animation:slideDown .25s ease}
+  @keyframes slideDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+  .clue-panel h3{margin:0 0 9px;font-size:14px}
+  .clue-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px}
+  .clue{display:flex;gap:8px;align-items:center;background:#fff;border:1.5px solid var(--line);border-radius:12px;padding:8px 10px;font-size:12.5px}
+  .clue .e{font-size:22px}
+  .clue b{display:block;font-size:12.5px}
+  .clue span{color:var(--ink-soft);font-size:11.5px}
+  .clue-note{margin:9px 0 0;font-size:11.5px;color:var(--ink-soft);line-height:1.6}
+
+  /* ---------- stage ---------- */
+  .stage-wrap{position:relative}
+  .scene{
+    position:relative;width:100%;aspect-ratio:2848/1600;overflow:hidden;
+    border-radius:22px;border:3px solid #fff;box-shadow:0 16px 40px rgba(90,65,30,.24);
+    background:#cfe9a0;user-select:none;touch-action:none;
+  }
+  .scene-bg{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none}
+  .layer{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+  .door-img{
+    position:absolute;left:17.06%;top:32.63%;width:14.47%;height:25.88%;
+    object-fit:fill;transform-origin:left center;display:none;
+    filter:drop-shadow(0 4px 6px rgba(0,0,0,.28));pointer-events:none;
+  }
+  .door-img.closed{display:block;animation:doorShut .42s cubic-bezier(.3,1.4,.5,1)}
+  @keyframes doorShut{from{transform:perspective(600px) rotateY(-80deg);opacity:.5}to{transform:none;opacity:1}}
+
+  /* hotspots */
+  .spot{position:absolute;border-radius:26px;cursor:pointer;transition:background .18s,box-shadow .18s,transform .18s;pointer-events:auto}
+  .spot:hover{background:rgba(255,255,255,.12);box-shadow:inset 0 0 0 2px rgba(255,255,255,.5)}
+  .spot.over{
+    background:rgba(255,236,160,.30);
+    box-shadow:inset 0 0 0 3px #ffd166,0 0 0 4px rgba(255,209,102,.35),0 0 22px rgba(255,190,60,.7);
+    transform:scale(1.015);
+  }
+  .spot.occupied{box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.22)}
+  .spot-label{
+    position:absolute;left:50%;top:-6px;transform:translate(-50%,-100%);
+    background:#4a3b2a;color:#fff;font-size:11.5px;font-weight:700;padding:4px 9px;
+    border-radius:9px;white-space:nowrap;opacity:0;transition:.18s;pointer-events:none;z-index:40;
+  }
+  .spot.over .spot-label,.spot:hover .spot-label{opacity:1;transform:translate(-50%,-100%) translateY(-2px)}
+  .spot-badges{position:absolute;right:2px;top:2px;display:flex;gap:2px;z-index:35}
+  .badge{
+    width:24px;height:24px;border-radius:50%;background:#fff;border:2px solid var(--orange);
+    display:flex;align-items:center;justify-content:center;font-size:13px;
+    box-shadow:0 2px 6px rgba(0,0,0,.2);cursor:pointer;pointer-events:auto;
+    animation:badgePop .3s cubic-bezier(.2,1.6,.4,1);
+  }
+  @keyframes badgePop{from{transform:scale(0)}to{transform:scale(1)}}
+  .door-tag{
+    position:absolute;left:17.5%;top:29%;font-size:11px;font-weight:800;color:#fff;
+    background:#4a3b2a;padding:3px 8px;border-radius:999px;pointer-events:none;
+    box-shadow:0 2px 6px rgba(0,0,0,.2);
+  }
+  .door-tag.open{background:#d1683c}
+
+  /* leaves / confetti / sparkles */
+  .leaf{position:absolute;width:16px;height:11px;border-radius:12px 2px 12px 2px;opacity:.95;animation:leafFall linear forwards}
+  @keyframes leafFall{
+    0%{transform:translate(0,-10px) rotate(0deg);opacity:1}
+    80%{opacity:1}
+    100%{transform:translate(var(--dx,40px),var(--dy,420px)) rotate(var(--rot,720deg));opacity:0}
+  }
+  .confetti{position:absolute;width:9px;height:14px;border-radius:2px;animation:confFall linear forwards}
+  @keyframes confFall{0%{transform:translateY(-20px) rotate(0)}100%{transform:translateY(760px) rotate(800deg);opacity:.1}}
+  .sparkle{position:absolute;font-size:18px;animation:spk .9s ease-out forwards}
+  @keyframes spk{from{transform:scale(.3);opacity:1}to{transform:scale(1.7) translateY(-24px);opacity:0}}
+
+  /* tokens */
+  .token{
+    position:absolute;cursor:grab;transition:filter .2s,transform .2s;
+    filter:drop-shadow(0 5px 7px rgba(60,40,20,.25));touch-action:none;z-index:20;
+  }
+  .token img{width:100%;height:100%;object-fit:contain;pointer-events:none;display:block}
+  .token:hover{filter:drop-shadow(0 8px 12px rgba(60,40,20,.35)) brightness(1.05);transform:translateY(-4px)}
+  .token.selected{filter:drop-shadow(0 0 0 4px #ffd166) drop-shadow(0 8px 12px rgba(60,40,20,.4));animation:tokenWiggle .5s ease-in-out infinite alternate}
+  @keyframes tokenWiggle{to{transform:translateY(-7px) rotate(3deg)}}
+  .token.dragging{opacity:.18}
+  .token.gone{opacity:0;transform:scale(.3);pointer-events:none;transition:all .35s}
+  .token.returning{transition:all .35s cubic-bezier(.3,1.5,.5,1)}
+  .drag-ghost{
+    position:fixed;z-index:9999;pointer-events:none;
+    transform:translate(-50%,-50%) scale(1.12) rotate(-4deg);
+    filter:drop-shadow(0 12px 16px rgba(50,35,15,.4));
+  }
+  .drag-ghost img{width:100%;height:100%;object-fit:contain;display:block}
+
+  /* dog */
+  .dog{
+    position:absolute;bottom:20%;left:-18%;height:23%;width:auto;z-index:45;
+    pointer-events:none;opacity:0;transition:opacity .3s;
+    filter:drop-shadow(0 8px 10px rgba(60,40,20,.3));
+  }
+  .dog img{height:100%;width:auto;display:block}
+  .dog.show{opacity:1}
+  .dog.walk{animation:dogWalk 4.2s ease-in-out forwards}
+  @keyframes dogWalk{
+    0%{left:-18%;transform:translateY(0) rotate(0)}
+    22%{left:22%;transform:translateY(-8px) rotate(-3deg)}
+    45%{left:40%;transform:translateY(0) rotate(0)}
+    70%{left:62%;transform:translateY(-8px) rotate(3deg)}
+    100%{left:78%;transform:translateY(0) rotate(0)}
+  }
+  .dog.bob{animation:bob .35s ease-in-out infinite alternate}
+  @keyframes bob{to{transform:translateY(-10px) rotate(3deg)}}
+  .dog.flee{animation:dogFlee 2.4s ease-in forwards}
+  @keyframes dogFlee{0%{left:70%;transform:scale(1)}100%{left:96%;bottom:38%;transform:scale(.28);opacity:0}}
+  .dog.chase{animation:dogChase 2.6s ease-in forwards}
+  @keyframes dogChase{0%{left:-20%}100%{left:110%}}
+  .runner{position:absolute;bottom:13%;height:13%;z-index:44;pointer-events:none;opacity:0}
+  .runner img{height:100%;width:auto;display:block;filter:drop-shadow(0 4px 6px rgba(0,0,0,.2))}
+  .runner.go{opacity:1;animation:runAway 2.3s ease-in forwards}
+  @keyframes runAway{0%{transform:translateX(0) rotate(0)}100%{transform:translateX(125vw) rotate(12deg);opacity:0}}
+  .bubble{
+    position:absolute;bottom:44%;left:50%;transform:translateX(-50%) scale(.7);
+    background:#fff;border:2px solid var(--line);border-radius:16px;padding:8px 14px;
+    font-size:14px;font-weight:700;box-shadow:var(--shadow);opacity:0;z-index:50;
+    transition:.3s;pointer-events:none;white-space:nowrap;
+  }
+  .bubble.show{opacity:1;transform:translateX(-50%) scale(1)}
+  .bubble:after{content:"";position:absolute;bottom:-9px;left:50%;margin-left:-8px;border:8px solid transparent;border-top-color:#fff}
+
+  /* toast */
+  .toast{
+    position:absolute;left:50%;bottom:9%;transform:translate(-50%,14px);
+    background:rgba(74,59,42,.93);color:#fff;padding:9px 18px;border-radius:999px;
+    font-size:13.5px;font-weight:700;opacity:0;transition:.25s;z-index:60;pointer-events:none;
+    box-shadow:0 6px 18px rgba(0,0,0,.2);white-space:nowrap;
+  }
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+
+  /* bottom bar */
+  .bottom-bar{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    margin-top:10px;flex-wrap:wrap;
+  }
+  .tip{
+    background:var(--paper);border:2px solid var(--line);border-radius:14px;
+    padding:8px 14px;font-size:12.5px;color:var(--ink-soft);box-shadow:var(--shadow);
+  }
+  .tip b{color:var(--orange-dark)}
+  .btn-end{
+    background:linear-gradient(180deg,#ff9a52,#e8763a);color:#fff;font-size:14px;font-weight:800;
+    padding:11px 20px;border-radius:16px;box-shadow:0 6px 0 #b95020,0 10px 20px rgba(180,80,30,.3);
+    transition:.15s;border:2px solid #fff5;
+  }
+  .btn-end:hover{transform:translateY(-2px);box-shadow:0 8px 0 #b95020,0 14px 24px rgba(180,80,30,.35)}
+  .btn-end:active{transform:translateY(4px);box-shadow:0 2px 0 #b95020}
+  .btn-end:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:0 4px 0 #b95020}
+  .door-hint{font-size:11.5px;color:var(--ink-soft)}
+
+  /* ---------- overlays ---------- */
+  .overlay{position:absolute;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;flex-direction:column}
+  .intro{
+    background:linear-gradient(180deg,#8fd4f2 0%,#c8eafb 42%,#f7f0d0 72%,#d8eaa0 100%);
+    overflow:hidden;transition:opacity .6s;
+  }
+  .intro.hide{opacity:0;pointer-events:none}
+  .intro-cloud{position:absolute;background:#fff;border-radius:100px;opacity:.85;filter:blur(1px)}
+  .c1{width:26%;height:16%;left:6%;top:9%;box-shadow:60px 10px 0 10px #fff}
+  .c2{width:20%;height:13%;right:8%;top:17%;box-shadow:-46px 8px 0 6px #fff}
+  .c3{width:14%;height:9%;left:38%;top:5%;opacity:.6}
+  .intro-title{text-align:center;z-index:3;margin-top:-6%}
+  .intro-title .kicker{font-size:13px;letter-spacing:5px;color:#3d6b85;font-weight:800}
+  .intro-title h2{
+    margin:6px 0 4px;font-size:clamp(30px,5.2vw,62px);letter-spacing:3px;
+    color:#fff;text-shadow:0 4px 0 #e8763a,0 8px 18px rgba(120,70,20,.35);
+  }
+  .intro-title p{margin:0;font-size:13px;color:#4a6b58;font-weight:700}
+  .chase-lane{position:absolute;left:0;right:0;bottom:22%;height:22%;z-index:2}
+  .chase-ground{
+    position:absolute;left:0;right:0;bottom:-2%;height:10%;
+    background:repeating-linear-gradient(90deg,rgba(255,255,255,.75) 0 24px,transparent 24px 74px);
+    -webkit-mask-image:linear-gradient(90deg,transparent,#000 18%,#000 84%,transparent);
+    mask-image:linear-gradient(90deg,transparent,#000 18%,#000 84%,transparent);
+    animation:groundMove .55s linear infinite;
+  }
+  @keyframes groundMove{to{background-position-x:-74px}}
+  .chaser{position:absolute;bottom:0;width:auto;z-index:2}
+  .chaser img{height:100%;width:auto;display:block;animation:hop .3s ease-in-out infinite alternate;transform-origin:50% 90%}
+  @keyframes hop{to{transform:translateY(-12px) rotate(4deg)}}
+  .chaser.a1{left:20%;height:60%}
+  .chaser.a2{left:32%;height:70%}
+  .chaser.a3{left:44%;height:56%}
+  .chaser.a4{left:56%;height:76%}
+  .chaser.a5{left:68%;height:82%}
+  .chaser.a1 img{animation-delay:-.05s}.chaser.a2 img{animation-delay:-.14s}
+  .chaser.a3 img{animation-delay:-.09s}.chaser.a4 img{animation-delay:-.2s}
+  .chaser.a5 img{animation-delay:-.16s}
+  .chaser.doggy{left:2%;height:100%;z-index:3}
+  .chaser.doggy img{animation-delay:-.02s;filter:drop-shadow(0 6px 6px rgba(80,60,40,.18))}
+  .dust{
+    position:absolute;bottom:1%;left:0%;width:34px;height:16px;border-radius:50%;
+    background:rgba(255,255,255,.85);z-index:1;animation:puff .55s ease-out infinite;
+  }
+  .dust.d2{left:-2%;animation-delay:.28s;width:24px;height:12px}
+  @keyframes puff{0%{transform:translateX(0) scale(.5);opacity:.95}100%{transform:translateX(-90px) scale(1.8);opacity:0}}
+  .intro-cloud{animation:cloudDrift 11s ease-in-out infinite alternate}
+  @keyframes cloudDrift{to{transform:translateX(26px)}}
+  .intro-actions{position:absolute;bottom:6%;z-index:5;display:flex;flex-direction:column;align-items:center;gap:8px}
+  .btn-start{
+    background:linear-gradient(180deg,#ffd36b,#f2a52f);color:#6b3c10;font-size:18px;font-weight:900;
+    padding:13px 40px;border-radius:999px;box-shadow:0 7px 0 #c97d15,0 12px 24px rgba(160,100,20,.3);
+    border:3px solid #fff;letter-spacing:2px;opacity:0;transform:scale(.6);pointer-events:none;transition:.35s cubic-bezier(.2,1.6,.4,1);
+  }
+  .btn-start.ready{opacity:1;transform:scale(1);pointer-events:auto}
+  .btn-start:hover{transform:scale(1.06)}
+  .btn-start:active{transform:translateY(4px);box-shadow:0 3px 0 #c97d15}
+  .btn-skip{background:transparent;font-size:12px;color:#4a6b58;text-decoration:underline;opacity:.8}
+  .duration-pick{display:flex;gap:8px;align-items:center;font-size:12px;color:#3d6b85;font-weight:800}
+  .dur{
+    background:#ffffffcc;border:2px solid #fff;border-radius:999px;padding:4px 12px;font-size:12px;font-weight:800;
+  }
+  .dur.sel{background:#e8763a;color:#fff;border-color:#fff}
+
+  .result-ov{background:rgba(35,28,18,.42);backdrop-filter:blur(3px);display:none}
+  .result-ov.show{display:flex}
+  .result-word{
+    font-size:clamp(56px,11vw,132px);font-weight:900;letter-spacing:12px;line-height:1;
+    color:#fff;opacity:0;transform:scale(.3) rotate(-8deg);
+    text-shadow:0 6px 0 rgba(0,0,0,.2),0 12px 30px rgba(0,0,0,.35);
+  }
+  .result-word.pop{animation:wordPop .7s cubic-bezier(.2,1.7,.4,1) forwards}
+  @keyframes wordPop{to{opacity:1;transform:scale(1) rotate(-3deg)}}
+  .result-word.win{color:#fff3a8;text-shadow:0 6px 0 #d79a1e,0 0 40px rgba(255,220,90,.9)}
+  .result-word.lose{color:#ffd2c4;text-shadow:0 6px 0 #a33a25,0 0 40px rgba(255,110,80,.7)}
+  .result-card{
+    display:none;width:min(92%,620px);max-height:74%;overflow:auto;background:var(--paper);
+    border:3px solid #fff;border-radius:22px;padding:18px 20px;box-shadow:0 20px 50px rgba(0,0,0,.35);
+    margin-top:14px;
+  }
+  .result-card.show{display:block;animation:cardUp .45s ease}
+  @keyframes cardUp{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:none}}
+  .result-card h3{margin:0 0 4px;font-size:21px}
+  .result-card .sub{margin:0 0 12px;font-size:13px;color:var(--ink-soft);line-height:1.6}
+  .check-list{display:grid;gap:6px;margin-bottom:14px}
+  .check-row{
+    display:flex;align-items:center;gap:9px;background:#fff;border:1.5px solid var(--line);
+    border-radius:12px;padding:7px 11px;font-size:13px;
+  }
+  .check-row .mark{font-size:17px;width:22px;text-align:center}
+  .check-row.ok{background:#f0fae4;border-color:#bde098}
+  .check-row.no{background:#fff0ec;border-color:#f3b9a6}
+  .check-row .where{margin-left:auto;color:var(--ink-soft);font-size:11.5px;text-align:right}
+  .btn-again{
+    width:100%;background:linear-gradient(180deg,#8fd05a,#63a832);color:#fff;font-size:16px;font-weight:900;
+    padding:12px;border-radius:14px;box-shadow:0 5px 0 #4c8527;letter-spacing:2px;
+  }
+  .btn-again:active{transform:translateY(3px);box-shadow:0 2px 0 #4c8527}
+  .peek-eyes{position:absolute;font-size:20px;z-index:30;pointer-events:none;animation:blinkIn .5s ease}
+  @keyframes blinkIn{from{opacity:0;transform:scale(.2)}to{opacity:1;transform:scale(1)}}
+
+  @media (max-width:720px){
+    .brand{min-width:100%}.brand h1{font-size:17px}
+    .clock{font-size:22px;min-width:88px}
+    .chips{order:4;width:100%}
+    .chip{font-size:11px;padding:3px 7px}
+    .tip{font-size:11px}
+    .btn-end{font-size:12.5px;padding:9px 14px}
+    .result-card{padding:14px}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="hud">
+    <div class="brand">
+      <div class="logo">🐾</div>
+      <div><h1>农场捉迷藏</h1><p>把小动物藏好，别让小狗找到！</p></div>
+    </div>
+    <div class="timer-wrap" id="timerWrap">
+      <div class="clock" id="clock">01:30</div>
+      <div class="timer-bar"><div class="timer-fill" id="timerFill"></div></div>
+    </div>
+    <div class="chips" id="chips"></div>
+    <div class="hud-btns">
+      <button class="icon-btn" id="btnClue">💡 线索</button>
+      <button class="icon-btn on" id="btnSound">🔊 音效</button>
+    </div>
+  </div>
+
+  <div class="clue-panel" id="cluePanel">
+    <h3>🔎 小动物们想藏在这些地方</h3>
+    <div class="clue-grid" id="clueGrid"></div>
+    <p class="clue-note">
+      点击 <b>太阳</b> 会自转一圈 · 点击 <b>大树</b> 会飘落树叶 · 点击 <b>木屋门</b> 可以开关（公鸡藏进去后一定要关门！）<br>
+      干草堆、木桶、粉色浇水壶、云朵、灌木丛、木箱都能藏，但藏错地方会被小狗发现哦。
+    </p>
+  </div>
+
+  <div class="stage-wrap">
+    <div class="scene" id="scene">
+      <img class="scene-bg" src="assets/scene.jpg" alt="农场场景">
+      <img class="door-img" id="doorImg" src="assets/door_closed.png" alt="关上的木门">
+      <div class="door-tag" id="doorTag">木屋门：开着</div>
+      <div class="layer" id="fxLayer"></div>
+      <div id="spotLayer"></div>
+      <div id="tokenLayer"></div>
+      <div class="dog" id="dog"><img src="assets/dog.png" alt="小狗"></div>
+      <div class="bubble" id="bubble"></div>
+      <div class="toast" id="toast"></div>
+
+      <!-- intro -->
+      <div class="overlay intro" id="intro">
+        <div class="intro-cloud c1"></div><div class="intro-cloud c2"></div><div class="intro-cloud c3"></div>
+        <div class="intro-title">
+          <div class="kicker">FARM HIDE &amp; SEEK</div>
+          <h2>农场捉迷藏</h2>
+          <p>小狗来啦！快帮小动物们找个好地方躲起来～</p>
+        </div>
+        <div class="chase-lane" id="chaseLane"></div>
+        <div class="intro-actions">
+          <div class="duration-pick">
+            <span>倒计时</span>
+            <button class="dur sel" data-sec="90">90 秒</button>
+            <button class="dur" data-sec="60">60 秒挑战</button>
+          </div>
+          <button class="btn-start" id="btnStart">开始躲藏 ▶</button>
+          <button class="btn-skip" id="btnSkip">跳过入场动画</button>
+        </div>
+      </div>
+
+      <!-- result -->
+      <div class="overlay result-ov" id="resultOv">
+        <div class="result-word" id="resultWord">成功</div>
+        <div class="result-card" id="resultCard">
+          <h3 id="resultTitle"></h3>
+          <p class="sub" id="resultSub"></p>
+          <div class="check-list" id="checkList"></div>
+          <button class="btn-again" id="btnAgain">🔄 再玩一次</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="bottom-bar">
+      <div class="tip" id="tip">👉 <b>拖动</b>小动物到场景里的物体上就能藏起来；也可以先点一下小动物，再点要藏的地方。</div>
+      <button class="btn-end" id="btnEnd" disabled>⏭ 我藏好了，让小狗来吧</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+const $ = (s,r=document)=>r.querySelector(s);
+const $$ = (s,r=document)=>Array.from(r.querySelectorAll(s));
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+
+/* ---------------- configuration ---------------- */
+const ANIMALS = {
+  turtle : {name:'小乌龟',emoji:'🐢',img:'assets/turtle.png', correct:'bush1',       clue:'大树底下第一个浅绿色灌木丛'},
+  pig    : {name:'小猪',  emoji:'🐖',img:'assets/pig.png',    correct:'wateringcan', clue:'粉色浇水壶里'},
+  chick  : {name:'小鸡',  emoji:'🐤',img:'assets/chick.png',  correct:'haystack',    clue:'金黄的干草堆里'},
+  rooster: {name:'公鸡',  emoji:'🐓',img:'assets/rooster.png',correct:'barn',        clue:'红色木屋门后（记得关门！）'},
+  sheep  : {name:'小羊',  emoji:'🐑',img:'assets/sheep.png',  correct:'cloud',       clue:'白白的云朵里'}
+};
+const ANIMAL_KEYS = Object.keys(ANIMALS);
+const SPOT_NAMES = {
+  cloud:'云朵', haystack:'干草堆', barrel:'木桶', wateringcan:'粉色浇水壶',
+  crate:'木箱', barn:'木屋门后', bush1:'第一个灌木丛', bush2:'深色灌木丛',
+  bushLeft:'左边灌木丛', tree:'大树', trunk:'树干', sun:'太阳',
+  conifer:'远处小树', pitchfork:'草叉', window:'木屋小窗'
+};
+// l/t/w/h are percentages of the 2848x1600 artwork
+const SPOT_DEFS = [
+  {id:'sun',       l:5.3, t:5.5,  w:8.5,  h:13,   z:8,  act:'spin'},
+  {id:'cloud',     l:33,  t:2,    w:23,   h:16,   z:9},
+  {id:'cloud',     l:0,   t:11,   w:9,    h:10,   z:7},
+  {id:'conifer',   l:86,  t:25,   w:13,   h:17,   z:8,  act:'sway'},
+  {id:'tree',      l:55,  t:0,    w:45,   h:37,   z:5,  act:'leaves'},
+  {id:'trunk',     l:74,  t:33,   w:11,   h:25,   z:6,  act:'leaves'},
+  {id:'barn',      l:16.5,t:32.5, w:15.5, h:27,   z:12, act:'door'},
+  {id:'window',    l:43.6,t:42,   w:3.6,  h:6.5,  z:11, act:'peek'},
+  {id:'haystack',  l:3.3, t:42,   w:12,   h:19,   z:6},
+  {id:'barrel',    l:1.8, t:47.5, w:6.5,  h:14,   z:10},
+  {id:'pitchfork', l:33,  t:41,   w:7,    h:19,   z:7,  act:'wobble'},
+  {id:'wateringcan',l:40.3,t:47,  w:9,    h:13.5, z:11},
+  {id:'crate',     l:47.5,t:47.5, w:10,   h:10,   z:8},
+  {id:'bush1',     l:56.8,t:46.5, w:22,   h:21,   z:9},
+  {id:'bush2',     l:79.5,t:37,   w:20.5, h:24,   z:10},
+  {id:'bushLeft',  l:0,   t:61,   w:11.5, h:17,   z:6}
+];
+// token rects = the exact crop rects used when generating the sprites
+const TOKEN_RECTS = {
+  turtle :{l:1360/2848*100,t:1195/1600*100,w:340/2848*100,h:245/1600*100},
+  pig    :{l:1655/2848*100,t:1140/1600*100,w:295/2848*100,h:300/1600*100},
+  chick  :{l:1900/2848*100,t:1090/1600*100,w:290/2848*100,h:350/1600*100},
+  rooster:{l:2130/2848*100,t:1065/1600*100,w:295/2848*100,h:375/1600*100},
+  sheep  :{l:2330/2848*100,t:1100/1600*100,w:420/2848*100,h:340/1600*100}
+};
+
+/* ---------------- state ---------------- */
+let phase = 'intro';
+let duration = 90;
+let timeLeft = 90;
+let timerId = null;
+let doorOpen = true;
+let hidden = {};          // animal -> {spot, el}
+let selected = null;
+let soundOn = true;
+let audioCtx = null;
+let justDropped = false;
+let drag = null;
+let toastTimer = null;
+
+/* ---------------- sound ---------------- */
+function tone(freq,dur,type,vol,delay){
+  if(!soundOn) return;
+  try{
+    if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    const t0 = audioCtx.currentTime + (delay||0);
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type = type||'sine'; o.frequency.setValueAtTime(freq,t0);
+    g.gain.setValueAtTime(0.0001,t0);
+    g.gain.exponentialRampToValueAtTime(vol||0.08,t0+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(t0); o.stop(t0+dur+0.02);
+  }catch(e){}
+}
+const sfx = {
+  click:()=>tone(680,.09,'sine',.05),
+  drop :()=>{tone(520,.1,'triangle',.07);tone(780,.13,'sine',.05,.07);},
+  wrong:()=>tone(200,.18,'sawtooth',.04),
+  door :()=>tone(150,.16,'triangle',.06),
+  leaf :()=>tone(880,.08,'sine',.03),
+  win  :()=>{[523,659,784,1047].forEach((f,i)=>tone(f,.35,'sine',.07,i*.11));},
+  lose :()=>{[392,330,262].forEach((f,i)=>tone(f,.4,'triangle',.06,i*.16));},
+  tick :()=>tone(1000,.06,'sine',.035)
+};
+
+/* ---------------- build UI ---------------- */
+const scene = $('#scene'), spotLayer = $('#spotLayer'), tokenLayer = $('#tokenLayer'), fx = $('#fxLayer');
+const spotEls = [];
+
+SPOT_DEFS.forEach(def=>{
+  const el = document.createElement('div');
+  el.className = 'spot';
+  el.dataset.spot = def.id;
+  el.style.cssText = `left:${def.l}%;top:${def.t}%;width:${def.w}%;height:${def.h}%;z-index:${def.z}`;
+  el.innerHTML = `<div class="spot-label">${SPOT_NAMES[def.id]}${def.id==='barn'?'（点击开关门）':''}</div><div class="spot-badges"></div>`;
+  el._act = def.act || null;
+  el._def = def;
+  el.addEventListener('click', ev=>onSpotClick(el,ev));
+  spotLayer.appendChild(el);
+  spotEls.push(el);
+});
+
+const tokenEls = {};
+ANIMAL_KEYS.forEach(k=>{
+  const r = TOKEN_RECTS[k];
+  const el = document.createElement('div');
+  el.className = 'token';
+  el.dataset.animal = k;
+  el.style.cssText = `left:${r.l}%;top:${r.t}%;width:${r.w}%;height:${r.h}%`;
+  el.innerHTML = `<img src="${ANIMALS[k].img}" alt="${ANIMALS[k].name}" draggable="false">`;
+  el.addEventListener('pointerdown', e=>onTokenDown(e,k,el));
+  tokenLayer.appendChild(el);
+  tokenEls[k] = el;
+});
+
+const chips = $('#chips');
+ANIMAL_KEYS.forEach(k=>{
+  const b = document.createElement('button');
+  b.className='chip'; b.dataset.chip=k;
+  b.innerHTML = `<span class="e">${ANIMALS[k].emoji}</span><span>${ANIMALS[k].name}</span>`;
+  b.addEventListener('click',()=>{
+    if(phase!=='hiding' || !hidden[k]) return;
+    recall(k); sfx.click();
+  });
+  chips.appendChild(b);
+});
+
+$('#clueGrid').innerHTML = ANIMAL_KEYS.map(k=>`
+  <div class="clue"><span class="e">${ANIMALS[k].emoji}</span><div><b>${ANIMALS[k].name}</b><span>${ANIMALS[k].clue}</span></div></div>
+`).join('') + `<div class="clue"><span class="e">🚪</span><div><b>额外条件</b><span>木屋门必须是关着的，不然算失败</span></div></div>`;
+
+// intro chase lane
+(()=>{
+  const lane = $('#chaseLane');
+  const ground = document.createElement('div'); ground.className='chase-ground'; lane.appendChild(ground);
+  ANIMAL_KEYS.forEach((k,i)=>{
+    const d = document.createElement('div');
+    d.className = `chaser a${i+1}`;
+    d.innerHTML = `<img src="${ANIMALS[k].img}" alt="">`;
+    lane.appendChild(d);
+  });
+  const d = document.createElement('div');
+  d.className='chaser doggy'; d.innerHTML=`<img src="assets/dog.png" alt="小狗">`;
+  lane.appendChild(d);
+  const dust = document.createElement('div'); dust.className='dust'; lane.appendChild(dust);
+  const dust2 = document.createElement('div'); dust2.className='dust d2'; lane.appendChild(dust2);
+})();
+
+/* ---------------- helpers ---------------- */
+function toast(msg,ms){
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(()=>t.classList.remove('show'), ms||1700);
+}
+function bubble(msg,ms){
+  const b = $('#bubble'); b.textContent=msg; b.classList.add('show');
+  clearTimeout(b._t); b._t = setTimeout(()=>b.classList.remove('show'), ms||1500);
+}
+function fmt(s){ const m=Math.floor(s/60), r=Math.floor(s%60); return `${String(m).padStart(2,'0')}:${String(r).padStart(2,'0')}`; }
+function updateClock(){
+  $('#clock').textContent = fmt(Math.max(0,timeLeft));
+  $('#timerFill').style.width = Math.max(0, timeLeft/duration*100)+'%';
+  $('#timerWrap').classList.toggle('danger', timeLeft<=10);
+}
+function refreshChips(){
+  ANIMAL_KEYS.forEach(k=>{
+    const b = $(`[data-chip="${k}"]`);
+    const done = !!hidden[k];
+    b.classList.toggle('done',done); b.classList.toggle('back',done);
+    b.innerHTML = `<span class="e">${done?'✅':ANIMALS[k].emoji}</span><span>${ANIMALS[k].name}</span>`;
+    b.title = done ? `藏在了「${SPOT_NAMES[hidden[k].spot]}」，点一下叫回来` : '还没有藏起来';
+  });
+}
+function clearOver(){ spotEls.forEach(s=>s.classList.remove('over')); }
+
+/* ---------------- interactions ---------------- */
+function dropLeaves(){
+  const colors = ['#7fb63a','#9ccf4a','#e0b53c','#d9792f','#6a9c34'];
+  for(let i=0;i<16;i++){
+    const e = document.createElement('div');
+    e.className='leaf';
+    e.style.left = (58 + Math.random()*40)+'%';
+    e.style.top = (2 + Math.random()*26)+'%';
+    e.style.background = colors[i%colors.length];
+    e.style.setProperty('--dx',(Math.random()*180-90)+'px');
+    e.style.setProperty('--dy',(300+Math.random()*380)+'px');
+    e.style.setProperty('--rot',(360+Math.random()*720)+'deg');
+    e.style.animationDuration = (2.2+Math.random()*1.8)+'s';
+    e.style.animationDelay = (Math.random()*.5)+'s';
+    fx.appendChild(e);
+    setTimeout(()=>e.remove(),4600);
+  }
+  sfx.leaf();
+}
+function sparkles(x,y,n){
+  const rect = scene.getBoundingClientRect();
+  for(let i=0;i<(n||7);i++){
+    const e=document.createElement('div'); e.className='sparkle'; e.textContent='✨';
+    e.style.left = ((x-rect.left)/rect.width*100 + (Math.random()*8-4))+'%';
+    e.style.top  = ((y-rect.top)/rect.height*100 + (Math.random()*8-4))+'%';
+    e.style.animationDelay=(Math.random()*.25)+'s';
+    fx.appendChild(e); setTimeout(()=>e.remove(),1300);
+  }
+}
+function confetti(){
+  const colors=['#f7bd3f','#e8763a','#6fae3f','#7fc4e8','#f09ab0','#fff'];
+  for(let i=0;i<70;i++){
+    const e=document.createElement('div'); e.className='confetti';
+    e.style.left=Math.random()*100+'%'; e.style.top=(-5-Math.random()*20)+'%';
+    e.style.background=colors[i%colors.length];
+    e.style.animationDuration=(1.8+Math.random()*2)+'s';
+    e.style.animationDelay=(Math.random()*1.2)+'s';
+    fx.appendChild(e); setTimeout(()=>e.remove(),4500);
+  }
+}
+function setDoor(open,quiet){
+  doorOpen = open;
+  const img = $('#doorImg'), tag = $('#doorTag');
+  img.classList.toggle('closed',!open);
+  tag.textContent = open ? '木屋门：开着' : '木屋门：关上了 ✓';
+  tag.classList.toggle('open',open);
+  if(!quiet){ sfx.door(); toast(open?'木屋门打开了':'🚪 木屋门关好了！'); }
+}
+function peekWindow(el){
+  const r = el.getBoundingClientRect(), s = scene.getBoundingClientRect();
+  const e=document.createElement('div'); e.className='peek-eyes'; e.textContent='👀';
+  e.style.left=((r.left-s.left)/s.width*100)+'%';
+  e.style.top =((r.top -s.top )/s.height*100)+'%';
+  fx.appendChild(e); setTimeout(()=>e.remove(),1200); sfx.click();
+}
+function spotAction(el,ev){
+  const id = el.dataset.spot, act = el._act;
+  if(act==='spin'){
+    // circular crop of the sun (square in real pixels: 160x160 of the 2848x1600 artwork)
+    const s = scene.getBoundingClientRect();
+    const L=6.32, T=6.25, W=5.62, H=10;
+    const sun = document.createElement('div');
+    sun.style.cssText = `position:absolute;left:${L}%;top:${T}%;width:${W}%;height:${H}%;`+
+      `background-image:url(assets/scene.jpg);background-size:${s.width}px ${s.height}px;`+
+      `background-position:${-L/100*s.width}px ${-T/100*s.height}px;border-radius:50%;`+
+      `z-index:14;pointer-events:none;transform-origin:50% 50%;animation:spinSun 1.15s ease-in-out forwards`;
+    fx.appendChild(sun); setTimeout(()=>sun.remove(),1250);
+    toast('☀️ 太阳转了一圈！'); sfx.click();
+    if(ev) sparkles(ev.clientX,ev.clientY,6);
+    return;
+  }
+  if(act==='leaves'){ dropLeaves(); toast('🍂 树叶飘下来啦～'); return; }
+  if(act==='door'){ setDoor(!doorOpen); return; }
+  if(act==='peek'){ peekWindow(el); return; }
+  if(act==='sway'||act==='wobble'){ el.animate([{transform:'rotate(0)'},{transform:'rotate(4deg)'},{transform:'rotate(-4deg)'},{transform:'rotate(0)'}],{duration:600}); sfx.click(); return; }
+  toast(`「${SPOT_NAMES[id]}」可以躲，想想谁该藏这里～`);
+  sfx.click();
+}
+function onSpotClick(el,ev){
+  if(phase!=='hiding' || justDropped) return;
+  if(selected){
+    hideAnimal(selected, el.dataset.spot, el);
+    clearSelection();
+  } else {
+    spotAction(el, ev);
+  }
+}
+function clearSelection(){
+  if(selected && tokenEls[selected]) tokenEls[selected].classList.remove('selected');
+  selected = null;
+}
+
+/* ---------------- drag ---------------- */
+function onTokenDown(e,k,el){
+  if(phase!=='hiding') return;
+  if(hidden[k]) return;
+  e.preventDefault();
+  if(audioCtx && audioCtx.state==='suspended') audioCtx.resume();
+  const rect = el.getBoundingClientRect();
+  drag = {k,el,x0:e.clientX,y0:e.clientY,moved:false,ghost:null,w:rect.width,h:rect.height};
+  const g = document.createElement('div');
+  g.className='drag-ghost';
+  g.style.width = Math.max(80,Math.min(170,rect.width))+'px';
+  g.style.height= (Math.max(80,Math.min(170,rect.width)) * rect.height/rect.width)+'px';
+  g.innerHTML = `<img src="${ANIMALS[k].img}" alt="">`;
+  document.body.appendChild(g);
+  drag.ghost = g;
+  moveGhost(e.clientX,e.clientY);
+  el.classList.add('dragging');
+  clearSelection();
+  document.addEventListener('pointermove',onPointerMove);
+  document.addEventListener('pointerup',onPointerUp);
+  document.addEventListener('pointercancel',onPointerUp);
+}
+function moveGhost(x,y){
+  if(!drag) return;
+  drag.ghost.style.left=x+'px'; drag.ghost.style.top=y+'px';
+}
+function onPointerMove(e){
+  if(!drag) return;
+  moveGhost(e.clientX,e.clientY);
+  if(Math.abs(e.clientX-drag.x0)+Math.abs(e.clientY-drag.y0)>8) drag.moved=true;
+  clearOver();
+  const under = document.elementFromPoint(e.clientX,e.clientY);
+  const sp = under && under.closest ? under.closest('[data-spot]') : null;
+  if(sp) sp.classList.add('over');
+}
+function onPointerUp(e){
+  if(!drag) return;
+  document.removeEventListener('pointermove',onPointerMove);
+  document.removeEventListener('pointerup',onPointerUp);
+  document.removeEventListener('pointercancel',onPointerUp);
+  const d = drag; drag=null;
+  d.ghost.remove(); d.el.classList.remove('dragging');
+  clearOver();
+  justDropped=true; setTimeout(()=>justDropped=false,80);
+
+  if(!d.moved){
+    // tap -> select, then tap a spot
+    clearSelection(); selected=d.k; d.el.classList.add('selected');
+    toast(`已选中 ${ANIMALS[d.k].name}，现在点一下要藏的地方`);
+    sfx.click();
+    return;
+  }
+  const under = document.elementFromPoint(e.clientX,e.clientY);
+  const sp = under && under.closest ? under.closest('[data-spot]') : null;
+  if(sp){
+    hideAnimal(d.k, sp.dataset.spot, sp);
+  } else {
+    d.el.classList.add('returning'); setTimeout(()=>d.el.classList.remove('returning'),360);
+    toast('这里不能藏哦，试试场景里的物体～'); sfx.wrong();
+  }
+}
+
+/* ---------------- hiding ---------------- */
+function hideAnimal(k,spotId,el){
+  if(phase!=='hiding' || hidden[k]) return;
+  hidden[k] = {spot:spotId, el};
+  const t = tokenEls[k];
+  t.classList.add('gone');
+  const badge = document.createElement('div');
+  badge.className='badge'; badge.textContent=ANIMALS[k].emoji;
+  badge.title = `${ANIMALS[k].name}藏在这里 · 点一下叫回来`;
+  badge.addEventListener('click',ev=>{ ev.stopPropagation(); if(phase==='hiding'){ recall(k); sfx.click(); } });
+  el.querySelector('.spot-badges').appendChild(badge);
+  el.classList.add('occupied');
+  hidden[k].badge = badge;
+  sparklesFromEl(el);
+  sfx.drop();
+  toast(`${ANIMALS[k].emoji} ${ANIMALS[k].name} 藏进「${SPOT_NAMES[spotId]}」啦！`);
+  if(k==='rooster' && spotId==='barn') setTimeout(()=>toast('🐓 别忘了点木屋门，把门关上！'),1800);
+  refreshChips();
+  if(Object.keys(hidden).length===ANIMAL_KEYS.length) setTimeout(()=>toast('全都藏好了！点右下角按钮让小狗来检查吧'),1900);
+}
+function recall(k){
+  const h = hidden[k]; if(!h) return;
+  if(h.badge) h.badge.remove();
+  if(!h.el.querySelector('.spot-badges').children.length) h.el.classList.remove('occupied');
+  delete hidden[k];
+  const t=tokenEls[k];
+  t.classList.remove('gone'); t.classList.add('returning');
+  setTimeout(()=>t.classList.remove('returning'),380);
+  toast(`${ANIMALS[k].name} 回来啦`);
+  refreshChips();
+}
+function sparklesFromEl(el){
+  const r=el.getBoundingClientRect();
+  sparkles(r.left+r.width/2, r.top+r.height/2, 8);
+}
+
+/* ---------------- timer & flow ---------------- */
+function startTimer(){
+  timeLeft = duration; updateClock();
+  clearInterval(timerId);
+  let lastTick = Math.ceil(timeLeft);
+  timerId = setInterval(()=>{
+    timeLeft -= .1;
+    if(timeLeft<=0){ timeLeft=0; updateClock(); clearInterval(timerId); startChecking(false); return; }
+    updateClock();
+    if(timeLeft<=10 && Math.ceil(timeLeft)!==lastTick){ lastTick=Math.ceil(timeLeft); sfx.tick(); }
+  },100);
+}
+function beginGame(){
+  if(phase!=='intro') return;
+  phase='hiding';
+  $('#intro').classList.add('hide');
+  setTimeout(()=>$('#intro').remove(),650);
+  $('#btnEnd').disabled=false;
+  setDoor(true,true);
+  startTimer();
+  toast('开始！把小动物拖到该藏的地方～',2400);
+  tone(660,.12,'sine',.06); tone(880,.18,'sine',.05,.12);
+}
+
+async function startChecking(early){
+  if(phase!=='hiding') return;
+  phase='checking';
+  clearInterval(timerId);
+  clearSelection();
+  $('#btnEnd').disabled=true;
+  $('#tip').innerHTML = early ? '你提前叫来了小狗，看看藏得怎么样～' : '⏰ 时间到！小狗来检查啦～';
+  const dog = $('#dog');
+  dog.classList.add('show','walk','bob');
+  bubble(early?'汪？这么快就藏好啦？':'汪汪！我来找你们啦～',1600);
+  sfx.click();
+  await sleep(1500); bubble('先看看木屋…',1300);
+  await sleep(1300); bubble('再闻闻草地和灌木丛…',1300);
+  await sleep(1300); bubble('咦？都藏好了吗？',1200);
+  await sleep(1200);
+  dog.classList.remove('walk','bob');
+  const results = ANIMAL_KEYS.map(k=>{
+    const h = hidden[k];
+    let ok = !!h && h.spot===ANIMALS[k].correct;
+    if(k==='rooster' && doorOpen) ok=false;
+    return {k, ok, where: h?SPOT_NAMES[h.spot]:'没有藏起来'};
+  });
+  const success = results.every(r=>r.ok);
+  await playEnding(success, results);
+}
+async function playEnding(success, results){
+  const dog = $('#dog');
+  if(success){
+    sfx.win(); confetti();
+    dog.style.left='62%'; dog.classList.add('flee');
+    bubble('汪～ 一个都没找到，我走啦！',2200);
+    // little eyes peeking from the correct hiding spots
+    ANIMAL_KEYS.forEach(k=>{
+      const el = hidden[k] && hidden[k].el;
+      if(!el) return;
+      const r=el.getBoundingClientRect(), s=scene.getBoundingClientRect();
+      const e=document.createElement('div'); e.className='peek-eyes'; e.textContent='👀';
+      e.style.left=((r.left-s.left)/s.width*100 + r.width/s.width*22)+'%';
+      e.style.top =((r.top -s.top )/s.height*100 + r.height/s.height*35)+'%';
+      fx.appendChild(e);
+    });
+  } else {
+    sfx.lose();
+    dog.classList.add('show','chase'); dog.style.left='-20%';
+    bubble('汪汪汪！找到你们啦～',2000);
+    // all animals pop out and run away
+    ANIMAL_KEYS.forEach((k,i)=>{
+      const r = document.createElement('div');
+      r.className='runner';
+      r.style.left=(6+i*9)+'%';
+      r.style.bottom=(10+(i%2)*4)+'%';
+      r.style.height=(11+(i%3))+'%';
+      r.style.zIndex=44+i;
+      r.innerHTML=`<img src="${ANIMALS[k].img}" alt="">`;
+      scene.appendChild(r);
+      setTimeout(()=>{ r.classList.add('go'); }, 120+i*160);
+      setTimeout(()=>r.remove(),3200+i*160);
+    });
+    setTimeout(()=>{ dog.classList.add('bob'); },700);
+  }
+  await sleep(500);
+  showResult(success, results);
+}
+function showResult(success,results){
+  phase='result';
+  const ov=$('#resultOv'), word=$('#resultWord');
+  ov.classList.add('show');
+  word.textContent = success?'成功':'失败';
+  word.className = 'result-word pop '+(success?'win':'lose');
+  $('#resultTitle').textContent = success?'🎉 太棒啦，一只都没被找到！':'😅 哎呀，被小狗发现啦！';
+  $('#resultSub').textContent = success
+    ? '小狗在农场里转了一圈，什么也没找到，只好朝远方跑走了。小动物们安全啦！'
+    : '小狗继续追着这群小动物跑远了。看看下面的提示，下次把它们藏到对的地方吧～';
+  $('#checkList').innerHTML = results.map(r=>{
+    const a=ANIMALS[r.k];
+    const note = r.ok ? '藏对啦' : (r.k==='rooster' && doorOpen && r.where===SPOT_NAMES.barn ? '门没关！' : '应该藏在：'+a.clue);
+    return `<div class="check-row ${r.ok?'ok':'no'}">
+      <span class="mark">${r.ok?'✅':'❌'}</span>
+      <span>${a.emoji} <b>${a.name}</b></span>
+      <span class="where">${r.where} · ${note}</span>
+    </div>`;
+  }).join('') + (doorOpen
+    ? `<div class="check-row no"><span class="mark">🚪</span><span><b>木屋门</b></span><span class="where">开着 · 应该关上</span></div>`
+    : `<div class="check-row ok"><span class="mark">🚪</span><span><b>木屋门</b></span><span class="where">关好了 ✓</span></div>`);
+  setTimeout(()=>$('#resultCard').classList.add('show'),1150);
+}
+
+/* ---------------- events ---------------- */
+$('#btnClue').addEventListener('click',()=>{
+  $('#cluePanel').classList.toggle('show');
+  $('#btnClue').classList.toggle('on');
+  sfx.click();
+});
+$('#btnSound').addEventListener('click',()=>{
+  soundOn=!soundOn;
+  $('#btnSound').classList.toggle('on',soundOn);
+  $('#btnSound').textContent = soundOn?'🔊 音效':'🔇 静音';
+  if(soundOn) sfx.click();
+});
+$$('.dur').forEach(b=>b.addEventListener('click',()=>{
+  $$('.dur').forEach(x=>x.classList.remove('sel'));
+  b.classList.add('sel'); duration=+b.dataset.sec; timeLeft=duration; updateClock(); sfx.click();
+}));
+$('#btnStart').addEventListener('click',beginGame);
+$('#btnSkip').addEventListener('click',()=>{ sfx.click(); beginGame(); });
+$('#btnEnd').addEventListener('click',()=>{ if(phase==='hiding'){ sfx.click(); startChecking(true); } });
+$('#btnAgain').addEventListener('click',()=>location.reload());
+setTimeout(()=>$('#btnStart').classList.add('ready'),2900);
+updateClock();
+// CSS keyframe for the sun (added here to keep the stylesheet tidy)
+const st=document.createElement('style');
+st.textContent='@keyframes spinSun{from{transform:rotate(0)}to{transform:rotate(360deg)}}';
+document.head.appendChild(st);
+})();
+</script>
+</body>
+</html>
